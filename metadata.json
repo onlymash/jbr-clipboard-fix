@@ -1,0 +1,8 @@
+{
+  "name": "JBR Clipboard Fix",
+  "description": "Fixes Chinese/Unicode clipboard encoding issues when copying from JetBrains IDEs (Android Studio, IntelliJ IDEA) on Wayland.",
+  "uuid": "jbr-clipboard-fix@yourname.github.com",
+  "shell-version": ["50"],
+  "url": "https://github.com/onlymash/jbr-clipboard-fix",
+  "version": 1
+}
