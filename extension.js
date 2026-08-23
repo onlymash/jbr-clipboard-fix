@@ -8,14 +8,15 @@ export default class JbrClipboardFixExtension extends Extension {
         this._selection = global.display.get_selection();
         this._clipboard = St.Clipboard.get_default();
         this._isRewriting = false;
-        this._timeoutId = null;
+        this._timeoutIds = new Set();
 
         this._ownerChangedId = this._selection.connect('owner-changed', (selection, selectionType) => {
             if (selectionType !== Meta.SelectionType.SELECTION_CLIPBOARD) return;
             if (this._isRewriting) return;
 
             // 稍微延迟 20ms，等待数据源在 Wayland 合成器中就绪
-            this._timeoutId = setTimeout(() => {
+            const debounceId = setTimeout(() => {
+                this._timeoutIds.delete(debounceId);
                 if (this._isRewriting) return;
 
                 const outputStream = Gio.MemoryOutputStream.new_resizable();
@@ -45,9 +46,11 @@ export default class JbrClipboardFixExtension extends Extension {
                                 this._isRewriting = true;
                                 this._clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
 
-                                setTimeout(() => {
+                                const resetId = setTimeout(() => {
+                                    this._timeoutIds.delete(resetId);
                                     this._isRewriting = false;
                                 }, 300);
+                                this._timeoutIds.add(resetId);
                             }
                         } catch (err) {
                             this._isRewriting = false;
@@ -55,6 +58,7 @@ export default class JbrClipboardFixExtension extends Extension {
                     }
                 );
             }, 20);
+            this._timeoutIds.add(debounceId);
         });
     }
 
@@ -63,10 +67,15 @@ export default class JbrClipboardFixExtension extends Extension {
             this._selection.disconnect(this._ownerChangedId);
             this._ownerChangedId = null;
         }
-        if (this._timeoutId) {
-            clearTimeout(this._timeoutId);
-            this._timeoutId = null;
+
+        if (this._timeoutIds) {
+            for (const id of this._timeoutIds) {
+                clearTimeout(id);
+            }
+            this._timeoutIds.clear();
+            this._timeoutIds = null;
         }
+
         this._selection = null;
         this._clipboard = null;
     }
