@@ -10,11 +10,21 @@ export default class JbrClipboardFixExtension extends Extension {
         this._isRewriting = false;
         this._timeoutIds = new Set();
 
-        this._ownerChangedId = this._selection.connect('owner-changed', (selection, selectionType) => {
+        this._ownerChangedId = this._selection.connect('owner-changed', (selection, selectionType, source) => {
             if (selectionType !== Meta.SelectionType.SELECTION_CLIPBOARD) return;
             if (this._isRewriting) return;
 
-            // 稍微延迟 20ms，等待数据源在 Wayland 合成器中就绪
+            if (!source) return;
+
+            const mimetypes = source.get_mimetypes();
+
+            const isFile = mimetypes.includes('text/uri-list') || mimetypes.includes('x-special/gnome-copied-files');
+            const isJbrBuggy = mimetypes.includes('text/plain;charset=US-ASCII') || mimetypes.includes('text/plain;charset=us-ascii');
+
+            if (isFile || !isJbrBuggy) {
+                return;
+            }
+
             const debounceId = setTimeout(() => {
                 this._timeoutIds.delete(debounceId);
                 if (this._isRewriting) return;
@@ -41,7 +51,6 @@ export default class JbrClipboardFixExtension extends Extension {
                             const decoder = new TextDecoder('utf-8');
                             const text = decoder.decode(dataArray);
 
-                            // 仅当包含多字节字符（如中文）时进行标准 UTF-8 重写
                             if (text && /[\u0080-\uffff]/.test(text)) {
                                 this._isRewriting = true;
                                 this._clipboard.set_text(St.ClipboardType.CLIPBOARD, text);
